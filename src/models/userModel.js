@@ -1,4 +1,4 @@
-const pool = require('../config/db'); // Importamos tu pool de promesas
+const pool = require('../config/db'); 
 
 const User = {
     findByEmail: async (correo) => {

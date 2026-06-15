@@ -3,6 +3,8 @@ const cors = require('cors');
 const pool = require('./config/db');
 const authRoutes = require('./routes/authRoutes'); 
 const jornadaRoutes = require('./routes/jornadaRoutes');
+const productoRoutes = require('./routes/productoRoutes');
+const ventaRoutes = require('./routes/ventaRoutes');
 
 const app = express();
 
@@ -20,5 +22,7 @@ app.get("/api/health", (req, res) => {
 
 app.use('/api/auth', authRoutes); 
 app.use('/api/jornada', jornadaRoutes);
+app.use('/api/producto', productoRoutes);
+app.use('/api/venta', ventaRoutes);
 
 module.exports = app;

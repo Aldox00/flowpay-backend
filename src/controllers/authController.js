@@ -10,17 +10,14 @@ exports.registrar = async (req, res) => {
     }
 
     try {
-        // 1. Verificar si el correo ya existe (ahora con await)
         const userExists = await User.findByEmail(correo);
         if (userExists) {
             return res.status(400).json({ ok: false, msg: 'El correo ya está registrado' });
         }
 
-        // 2. Encriptar la contraseña
         const salt = await bcrypt.genSalt(10);
         const hashedContrasena = await bcrypt.hash(contrasena, salt);
 
-        // 3. Guardar en la base de datos (ahora con await)
         await User.create({ nombre, correo, contrasena: hashedContrasena });
         
         return res.status(201).json({ ok: true, msg: 'Usuario registrado con éxito' });
@@ -39,19 +36,16 @@ exports.login = async (req, res) => {
     }
 
     try {
-        // 1. Buscar usuario por correo (ahora con await)
         const user = await User.findByEmail(correo);
         if (!user) {
             return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Correo no encontrado)' });
         }
 
-        // 2. Verificar contraseña
         const isMatch = await bcrypt.compare(contrasena, user.contrasena);
         if (!isMatch) {
             return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Contraseña incorrecta)' });
         }
 
-        // 3. Generar Token JWT
         const token = jwt.sign(
             { id: user.id, nombre: user.nombre },
             process.env.JWT_SECRET || 'firma_secreta_flowpay',
