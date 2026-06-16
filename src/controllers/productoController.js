@@ -2,35 +2,50 @@ const Producto = require('../models/productoModel');
 
 exports.crearProducto = async (req, res) => {
     const { usuario_id, nombre, precio } = req.body;
-
     if (!usuario_id || !nombre || precio === undefined) {
-        return res.status(400).json({ ok: false, msg: 'Todos los campos (usuario_id, nombre, precio) son obligatorios.' });
+        return res.status(400).json({ ok: false, msg: 'Datos del producto incompletos.' });
     }
-
     try {
         const result = await Producto.create({ usuario_id, nombre, precio });
-        return res.status(201).json({
-            ok: true,
-            msg: 'Producto agregado al catálogo con éxito.',
-            productoId: result.insertId
-        });
+        return res.status(201).json({ ok: true, msg: 'Producto creado exitosamente.', id: result.insertId });
     } catch (error) {
-        console.error('Error al crear producto:', error);
-        return res.status(500).json({ ok: false, msg: 'Error en el servidor al registrar el producto.' });
+        console.error(error);
+        return res.status(500).json({ ok: false, msg: 'Error al crear el producto.' });
     }
 };
 
-exports.obtenerProductos = async (req, res) => {
+exports.obtenerProductosActivos = async (req, res) => {
     const { usuario_id } = req.params;
-
     try {
-        const productos = await Producto.findByUsuarioId(usuario_id);
-        return res.status(200).json({
-            ok: true,
-            productos
-        });
+        const productos = await Producto.findActivosByUsuarioId(usuario_id);
+        return res.status(200).json({ ok: true, productos });
     } catch (error) {
-        console.error('Error al obtener productos:', error);
-        return res.status(500).json({ ok: false, msg: 'Error en el servidor al empaquetar el catálogo.' });
+        console.error(error);
+        return res.status(500).json({ ok: false, msg: 'Error al obtener productos activos.' });
+    }
+};
+
+exports.obtenerTodoElCatalogo = async (req, res) => {
+    const { usuario_id } = req.params;
+    try {
+        const productos = await Producto.findAllByUsuarioId(usuario_id);
+        return res.status(200).json({ ok: true, productos });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, msg: 'Error al obtener el catálogo completo.' });
+    }
+};
+
+exports.actualizarEstadoProducto = async (req, res) => {
+    const { id, activo } = req.body; // activo será 1 o 0
+    if (id === undefined || activo === undefined) {
+        return res.status(400).json({ ok: false, msg: 'ID y estado activo son requeridos.' });
+    }
+    try {
+        await Producto.updateEstado(id, activo);
+        return res.status(200).json({ ok: true, msg: 'Estado del producto actualizado correctamente.' });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, msg: 'Error al actualizar el estado del producto.' });
     }
 };

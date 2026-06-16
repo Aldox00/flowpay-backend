@@ -4,6 +4,6 @@ const jornadaController = require('../controllers/jornadaController');
 
 router.post('/abrir', jornadaController.abrirJornada);
 router.get('/estado/:usuario_id', jornadaController.obtenerEstadoJornada);
-router.put('/cerrar', jornadaController.cerrarJornada); // <-- Endpoint de Cierre de Caja
+router.put('/cerrar', jornadaController.cerrarJornada); 
 
 module.exports = router;

@@ -55,6 +55,21 @@ const Jornada = {
             total_vendido: efectivo + transferencia,
             ganancia_neta
         };
+    }, 
+
+    verificarCandadoHistorial: async (usuario_id) => {
+        const query = `
+            SELECT encuesta_contestada 
+            FROM jornadas 
+            WHERE usuario_id = ? AND estado = 'cerrada'
+            ORDER BY fecha_fin DESC 
+            LIMIT 1
+        `;
+        const [rows] = await pool.query(query, [usuario_id]);
+        
+        if (rows.length === 0) return true; 
+        
+        return rows[0].encuesta_contestada === 1;
     }
 };
 

@@ -5,6 +5,8 @@ const authRoutes = require('./routes/authRoutes');
 const jornadaRoutes = require('./routes/jornadaRoutes');
 const productoRoutes = require('./routes/productoRoutes');
 const ventaRoutes = require('./routes/ventaRoutes');
+const encuestaRoutes = require('./routes/encuestaRoutes');
+const reporteRoutes = require('./routes/reporteRoutes');
 
 const app = express();
 
@@ -24,5 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/jornada', jornadaRoutes);
 app.use('/api/producto', productoRoutes);
 app.use('/api/venta', ventaRoutes);
+app.use('/api/encuesta', encuestaRoutes);
+app.use('/api/reporte', reporteRoutes);
 
 module.exports = app;
