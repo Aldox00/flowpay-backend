@@ -54,14 +54,30 @@ exports.obtenerEstadoJornada = async (req, res) => {
 };
 
 exports.cerrarJornada = async (req, res) => {
-    const { jornada_id } = req.body;
+    // 1. Extraemos de forma segura los campos que envía la app (con valores por defecto por si acaso)
+    const { 
+        jornada_id, 
+        monto_inversion = null,
+        monto_ventas_efectivo = 0.0, 
+        monto_ventas_transferencia = 0.0, 
+        ganancia_neta = 0.0, 
+        encuesta_contestada = 0 
+    } = req.body;
 
     if (!jornada_id) {
         return res.status(400).json({ ok: false, msg: 'El ID de la jornada es obligatorio para realizar el cierre.' });
     }
 
     try {
-        const balanceFinal = await Jornada.cerrar(jornada_id);
+        // 2. Le pasamos TODOS los datos al modelo para que los mande a MySQL
+        const balanceFinal = await Jornada.cerrar({
+            jornada_id,
+            monto_inversion,
+            monto_ventas_efectivo,
+            monto_ventas_transferencia,
+            ganancia_neta,
+            encuesta_contestada
+        });
 
         return res.status(200).json({
             ok: true,

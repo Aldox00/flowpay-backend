@@ -18,7 +18,8 @@ app.get("/api/health", (req, res) => {
         estado: "servidor corriendo",
         proyecto: "FlowPay",
         fecha_servidor: new Date(),
-        cesar: "alejandro"
+        cesar: "alejandro",
+        aldo: "puto"
     });
 });
 
@@ -28,5 +29,7 @@ app.use('/api/producto', productoRoutes);
 app.use('/api/venta', ventaRoutes);
 app.use('/api/encuesta', encuestaRoutes);
 app.use('/api/reporte', reporteRoutes);
+
+
 
 module.exports = app;
