@@ -21,6 +21,7 @@ exports.registrar = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedContrasena = await bcrypt.hash(contrasena, salt);
 
+        // 🟢 Mantenemos el comportamiento por defecto de la base de datos ('manual')
         await User.create({ nombre, correo, contrasena: hashedContrasena });
         
         return res.status(201).json({ ok: true, msg: 'Usuario registrado con éxito' });
@@ -42,6 +43,14 @@ exports.login = async (req, res) => {
         const user = await User.findByCorreo(correo);
         if (!user) {
             return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Correo no encontrado)' });
+        }
+
+        // 🟢 VALIDACIÓN QUIRÚRGICA: Si se registró con Google, bloqueamos el login manual
+        if (user.proveedor_auth === 'google') {
+            return res.status(400).json({ 
+                ok: false, 
+                msg: 'Esta cuenta utiliza autenticación de Google. Por favor, inicia sesión con el botón de Google.' 
+            });
         }
 
         const isMatch = await bcrypt.compare(contrasena, user.contrasena);
@@ -92,13 +101,16 @@ exports.googleLogin = async (req, res) => {
         let user = await User.findByCorreo(email);
         
         if (!user) {
+            // 🟢 MODIFICACIÓN: Si necesitas guardar el proveedor, asegúrate de que tu modelo 'createGoogleUser' 
+            // mande 'google' en el campo proveedor_auth, o modifícalo directamente en tu base de datos si usas un Raw Query.
             const newUserId = await User.createGoogleUser(name, email);
             user = { 
                 id: newUserId, 
                 nombre: name, 
                 correo: email, 
                 recordatorio_cierre: 0, 
-                hora_recordatorio: null 
+                hora_recordatorio: null,
+                proveedor_auth: 'google' // 🟢 Lo dejamos en memoria para este objeto temporal
             };
         }
 
@@ -126,8 +138,6 @@ exports.googleLogin = async (req, res) => {
     }
 };
 
-
-
 exports.solicitarRecuperacion = async (req, res) => {
     const { correo } = req.body;
 
@@ -139,6 +149,14 @@ exports.solicitarRecuperacion = async (req, res) => {
         const user = await User.findByCorreo(correo);
         if (!user) {
             return res.status(400).json({ ok: false, msg: 'No se encontró ningún usuario con este correo.' });
+        }
+
+        // 🟢 VALIDACIÓN EXTRA: Tampoco dejamos recuperar contraseña a una cuenta de Google
+        if (user.proveedor_auth === 'google') {
+            return res.status(400).json({ 
+                ok: false, 
+                msg: 'Esta cuenta está registrada con Google. No es necesario restablecer contraseña.' 
+            });
         }
 
         const tokenRecuperacion = jwt.sign(

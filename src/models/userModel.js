@@ -8,14 +8,15 @@ const User = {
     },
 
     create: async (userData) => {
+        // Al crearse normal, la base de datos le pone 'manual' por defecto gracias al DEFAULT que metiste en Workbench
         const query = 'INSERT INTO usuarios (nombre, correo, contrasena) VALUES (?, ?, ?)';
         const [result] = await pool.query(query, [userData.nombre, userData.correo, userData.contrasena]);
         return result;
     },
 
     createGoogleUser: async (nombre, correo) => {
-        // Al haber alterado la tabla a NULL, insertamos explícitamente un campo nulo
-        const query = 'INSERT INTO usuarios (nombre, correo, contrasena) VALUES (?, ?, NULL)';
+        // 🟢 MODIFICACIÓN QUIRÚRGICA: Insertamos explícitamente 'google' en la nueva columna
+        const query = 'INSERT INTO usuarios (nombre, correo, contrasena, proveedor_auth) VALUES (?, ?, NULL, "google")';
         const [result] = await pool.query(query, [nombre, correo]);
         return result.insertId; // Retorna el ID del nuevo usuario creado
     },
