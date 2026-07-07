@@ -2,11 +2,10 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
-const SibApiV3Sdk = require('@getbrevo/brevo'); 
+const Brevo = require('@getbrevo/brevo'); 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-const apiKey = apiInstance.authentications['apiKey'];
-apiKey.apiKey = process.env.SMTP_PASS; 
+const apiInstance = new Brevo.TransactionalEmailsApi();
+apiInstance.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.SMTP_PASS);
 
 exports.registrar = async (req, res) => {
     const { nombre, correo, contrasena } = req.body;
@@ -159,7 +158,7 @@ exports.solicitarRecuperacion = async (req, res) => {
             await User.updateRecoveryCode(user.id, codigoSecreto, tiempoExpiracion);
         }
 
-        const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+        const sendSmtpEmail = new Brevo.SendSmtpEmail();
         sendSmtpEmail.subject = "🔢 Código de recuperación de contraseña - FlowPay";
         sendSmtpEmail.htmlContent = `
             <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
@@ -179,7 +178,7 @@ exports.solicitarRecuperacion = async (req, res) => {
 
         try {
             await apiInstance.sendTransacEmail(sendSmtpEmail);
-            console.log(`📧 Correo enviado con éxito por API HTTP a: ${user.correo}`);
+            console.log(`📧 Correo enviado real con éxito vía API HTTP a: ${user.correo}`);
         } catch (mailError) {
             console.error('❌ Error enviando a través de la API de Brevo:', mailError.message);
         }
