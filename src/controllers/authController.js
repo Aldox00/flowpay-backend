@@ -101,17 +101,26 @@ exports.googleLogin = async (req, res) => {
         let user = await User.findByCorreo(email);
         
         if (!user) {
-            // 🟢 MODIFICACIÓN: Si necesitas guardar el proveedor, asegúrate de que tu modelo 'createGoogleUser' 
-            // mande 'google' en el campo proveedor_auth, o modifícalo directamente en tu base de datos si usas un Raw Query.
-            const newUserId = await User.createGoogleUser(name, email);
-            user = { 
-                id: newUserId, 
-                nombre: name, 
-                correo: email, 
-                recordatorio_cierre: 0, 
-                hora_recordatorio: null,
-                proveedor_auth: 'google' // 🟢 Lo dejamos en memoria para este objeto temporal
-            };
+            try {
+                // 🟢 Intentamos registrar al usuario nuevo automáticamente usando tu modelo original
+                const newUserId = await User.createGoogleUser(name, email);
+                user = { 
+                    id: newUserId, 
+                    nombre: name, 
+                    correo: email, 
+                    recordatorio_cierre: 0, 
+                    hora_recordatorio: null,
+                    proveedor_auth: 'google' 
+                };
+            } catch (dbError) {
+                // 🔴 Si la base de datos de Aiven rebota el registro, aquí atrapamos el porqué real de forma limpia
+                console.error('❌ ERROR REAL EN BD AL CREAR USUARIO GOOGLE:', dbError);
+                return res.status(500).json({ 
+                    ok: false, 
+                    msg: 'Error interno en la base de datos al registrar la nueva cuenta de Google.',
+                    error: dbError.message 
+                });
+            }
         }
 
         const token = jwt.sign(
@@ -133,7 +142,8 @@ exports.googleLogin = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error en Google Auth:', error);
+        // 🔴 Este bloque ahora sólo se ejecuta si el token de Google de verdad es inválido o falló la verificación
+        console.error('Error en Google Auth (Token):', error);
         return res.status(401).json({ ok: false, msg: 'Token de Google inválido o expirado.' });
     }
 };
