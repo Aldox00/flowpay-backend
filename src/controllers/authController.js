@@ -21,7 +21,6 @@ exports.registrar = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedContrasena = await bcrypt.hash(contrasena, salt);
 
-        // 🟢 Mantenemos el comportamiento por defecto de la base de datos ('manual')
         await User.create({ nombre, correo, contrasena: hashedContrasena });
         
         return res.status(201).json({ ok: true, msg: 'Usuario registrado con éxito' });
@@ -45,7 +44,6 @@ exports.login = async (req, res) => {
             return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Correo no encontrado)' });
         }
 
-        // 🟢 VALIDACIÓN QUIRÚRGICA: Si se registró con Google, bloqueamos el login manual
         if (user.proveedor_auth === 'google') {
             return res.status(400).json({ 
                 ok: false, 
@@ -102,7 +100,6 @@ exports.googleLogin = async (req, res) => {
         
         if (!user) {
             try {
-                // 🟢 Intentamos registrar al usuario nuevo automáticamente usando tu modelo original
                 const newUserId = await User.createGoogleUser(name, email);
                 user = { 
                     id: newUserId, 
@@ -113,7 +110,6 @@ exports.googleLogin = async (req, res) => {
                     proveedor_auth: 'google' 
                 };
             } catch (dbError) {
-                // 🔴 Si la base de datos de Aiven rebota el registro, aquí atrapamos el porqué real de forma limpia
                 console.error('❌ ERROR REAL EN BD AL CREAR USUARIO GOOGLE:', dbError);
                 return res.status(500).json({ 
                     ok: false, 
@@ -142,7 +138,6 @@ exports.googleLogin = async (req, res) => {
         });
 
     } catch (error) {
-        // 🔴 Este bloque ahora sólo se ejecuta si el token de Google de verdad es inválido o falló la verificación
         console.error('Error en Google Auth (Token):', error);
         return res.status(401).json({ ok: false, msg: 'Token de Google inválido o expirado.' });
     }
@@ -161,7 +156,6 @@ exports.solicitarRecuperacion = async (req, res) => {
             return res.status(400).json({ ok: false, msg: 'No se encontró ningún usuario con este correo.' });
         }
 
-        // 🟢 VALIDACIÓN EXTRA: Tampoco dejamos recuperar contraseña a una cuenta de Google
         if (user.proveedor_auth === 'google') {
             return res.status(400).json({ 
                 ok: false, 
@@ -212,5 +206,28 @@ exports.restablecerContrasena = async (req, res) => {
     } catch (error) {
         console.error('Error en restablecerContrasena:', error);
         return res.status(401).json({ ok: false, msg: 'El token es inválido o ha expirado.' });
+    }
+};
+
+exports.verificarProveedor = async (req, res) => {
+    const { correo } = req.query;
+
+    if (!correo) {
+        return res.status(400).json({ ok: false, msg: 'El correo es requerido' });
+    }
+
+    try {
+        const user = await User.findByCorreo(correo);
+        
+        if (!user) {
+            return res.status(200).json({ ok: true, esGoogle: false });
+        }
+
+        const esGoogle = user.proveedor_auth === 'google';
+        return res.status(200).json({ ok: true, esGoogle });
+
+    } catch (error) {
+        console.error('Error al verificar proveedor:', error);
+        return res.status(500).json({ ok: false, msg: 'Error en el servidor al verificar proveedor' });
     }
 };

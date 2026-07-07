@@ -18,11 +18,9 @@ const Jornada = {
     },
 
     cerrar: async (datosCierre) => {
-        // Soporte dinámico: si pasan un objeto con los datos usamos desestructuración, si no, asumimos que es solo el ID viejo
         const esObjetoCompleto = typeof datosCierre === 'object' && datosCierre !== null;
         const id_jornada = esObjetoCompleto ? datosCierre.jornada_id : datosCierre;
 
-        // 1. Ejecutamos tu consulta original para traer la información de la base de datos por seguridad
         const queryTotales = `
             SELECT 
                 j.monto_inversion,
@@ -39,7 +37,6 @@ const Jornada = {
 
         const bd = rows[0];
 
-        // 2. Prioridad: Usamos los datos reales enviados por el teléfono; si no vienen, usamos el cálculo del backend
         const inversionFinal = (esObjetoCompleto && datosCierre.monto_inversion !== null) 
             ? parseFloat(datosCierre.monto_inversion) 
             : parseFloat(bd.monto_inversion);
@@ -60,7 +57,6 @@ const Jornada = {
             ? parseInt(datosCierre.encuesta_contestada, 10) 
             : 0;
 
-        // 3. Modificamos la consulta UPDATE para que ahora guarde la inversión actualizada, las encuestas Y la fecha final
         const queryUpdate = `
             UPDATE jornadas 
             SET 
@@ -83,7 +79,6 @@ const Jornada = {
             id_jornada
         ]);
 
-        // Retornamos el balance final estructurado exactamente igual que antes para no romper la respuesta JSON de la API
         return {
             inversion: inversionFinal,
             monto_ventas_efectivo: efectivoFinal,

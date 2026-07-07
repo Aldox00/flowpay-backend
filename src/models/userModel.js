@@ -8,14 +8,12 @@ const User = {
     },
 
     create: async (userData) => {
-        // Al crearse normal, la base de datos le pone 'manual' por defecto gracias al DEFAULT que metiste en Workbench
         const query = 'INSERT INTO usuarios (nombre, correo, contrasena) VALUES (?, ?, ?)';
         const [result] = await pool.query(query, [userData.nombre, userData.correo, userData.contrasena]);
         return result;
     },
 
     createGoogleUser: async (nombre, correo) => {
-        // 🟢 SOLUCIÓN: Usamos backticks afuera y comillas simples para 'google' para que MySQL lea el valor correctamente
         const query = `INSERT INTO usuarios (nombre, correo, contrasena, proveedor_auth) VALUES (?, ?, NULL, 'google')`;
         const [result] = await pool.query(query, [nombre, correo]);
         return result.insertId; // Retorna el ID del nuevo usuario creado

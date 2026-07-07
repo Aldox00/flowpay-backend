@@ -6,16 +6,14 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: parseInt(process.env.DB_PORT) || 12926, // 🟢 Forzamos el casteo a número por si Render lo lee como texto
+  port: parseInt(process.env.DB_PORT) || 12926, 
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   
-  // 🟢 Parámetros de tiempo extra para que Aiven no cierre la puerta antes de tiempo
   connectTimeout: 20000, 
   acquireTimeout: 20000,
   
-  // 🟢 Configuración SSL robusta requerida por DigitalOcean/Aiven
   ssl: {
     rejectUnauthorized: false
   }

@@ -54,7 +54,6 @@ exports.obtenerEstadoJornada = async (req, res) => {
 };
 
 exports.cerrarJornada = async (req, res) => {
-    // 1. Extraemos de forma segura los campos que envía la app (con valores por defecto por si acaso)
     const { 
         jornada_id, 
         monto_inversion = null,
@@ -69,7 +68,6 @@ exports.cerrarJornada = async (req, res) => {
     }
 
     try {
-        // 2. Le pasamos TODOS los datos al modelo para que los mande a MySQL
         const balanceFinal = await Jornada.cerrar({
             jornada_id,
             monto_inversion,
