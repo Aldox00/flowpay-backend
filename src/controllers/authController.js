@@ -163,23 +163,52 @@ exports.solicitarRecuperacion = async (req, res) => {
             });
         }
 
-        const tokenRecuperacion = jwt.sign(
-            { id: user.id, correo: user.correo },
+        const codigoSecreto = Math.floor(100000 + Math.random() * 900000).toString();
+
+        const tokenConCodigo = jwt.sign(
+            { id: user.id, correo: user.correo, codigo: codigoSecreto },
             process.env.JWT_SECRET || 'firma_secreta_flowpay',
             { expiresIn: '15m' }
         );
 
-        console.log(`\n=== TOKEN DE RECUPERACIÓN GENERADO ===\n${tokenRecuperacion}\n======================================\n`);
+   
+        console.log(`\n=== 🔢 CÓDIGO ENVIADO A ${correo}: ${codigoSecreto} ===`);
+        console.log(`=== TOKEN CON CÓDIGO (Enviar a Android): ${tokenConCodigo} ===\n`);
 
         return res.status(200).json({
             ok: true,
-            msg: 'Token de recuperación generado con éxito.',
-            token: tokenRecuperacion
+            msg: 'Código de verificación enviado con éxito a tu correo.',
+            token: tokenConCodigo 
         });
 
     } catch (error) {
         console.error('Error en solicitarRecuperacion:', error);
         return res.status(500).json({ ok: false, msg: 'Error interno en el servidor al solicitar recuperación.' });
+    }
+};
+
+exports.verificarCodigo = async (req, res) => {
+    const { token, codigoIngresado } = req.body;
+
+    if (!token || !codigoIngresado) {
+        return res.status(400).json({ ok: false, msg: 'El token y el código son obligatorios.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'firma_secreta_flowpay');
+
+        if (decoded.codigo !== codigoIngresado.trim()) {
+            return res.status(400).json({ ok: false, msg: 'El código de verificación es incorrecto.' });
+        }
+
+        return res.status(200).json({
+            ok: true,
+            msg: 'Código verificado con éxito. Identidad confirmada.'
+        });
+
+    } catch (error) {
+        console.error('Error en verificarCodigo:', error);
+        return res.status(401).json({ ok: false, msg: 'El código ha expirado o el token es inválido. Intenta de nuevo.' });
     }
 };
 
