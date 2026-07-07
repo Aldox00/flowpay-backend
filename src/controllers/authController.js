@@ -2,9 +2,20 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
-const { Resend } = require('resend');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
-const resend = new Resend(process.env.RESEND_API_KEY);
+const nodemailer = require('nodemailer'); 
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: false, 
+    auth: {
+        user: process.env.SMTP_USER, 
+        pass: process.env.SMTP_PASS  
+    },
+    tls: {
+        rejectUnauthorized: false 
+    }
+});
 
 exports.registrar = async (req, res) => {
     const { nombre, correo, contrasena } = req.body;
@@ -158,9 +169,9 @@ exports.solicitarRecuperacion = async (req, res) => {
         }
 
         try {
-            await resend.emails.send({
-                from: 'FlowPay <onboarding@resend.dev>', 
-                to: user.correo,                      
+            const mailOptions = {
+                from: `"FlowPay Soporte" <${process.env.SMTP_USER}>`, 
+                to: user.correo,
                 subject: '🔢 Código de recuperación de contraseña - FlowPay',
                 html: `
                     <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
@@ -175,10 +186,12 @@ exports.solicitarRecuperacion = async (req, res) => {
                         <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos.</p>
                     </div>
                 `
-            });
-            console.log(`\n📧 Correo real despachado con éxito vía Resend a: ${user.correo}`);
+            };
+
+            await transporter.sendMail(mailOptions);
+            console.log(`📧 Correo enviado real con éxito vía Brevo a: ${user.correo}`);
         } catch (mailError) {
-            console.error('❌ Error de conexión con la API de Resend:', mailError.message);
+            console.error('❌ Error enviando a través del servidor SMTP de Brevo:', mailError.message);
         }
 
         console.log(`\n=== 🔢 CÓDIGO GUARDADO EN SERVIDOR: ${codigoSecreto} ===\n`);
