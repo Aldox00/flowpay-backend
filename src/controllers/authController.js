@@ -2,20 +2,11 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
-const nodemailer = require('nodemailer'); 
+const SibApiV3Sdk = require('@getbrevo/brevo'); 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false, 
-    auth: {
-        user: process.env.SMTP_USER, 
-        pass: process.env.SMTP_PASS  
-    },
-    tls: {
-        rejectUnauthorized: false 
-    }
-});
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+const apiKey = apiInstance.authentications['apiKey'];
+apiKey.apiKey = process.env.SMTP_PASS; 
 
 exports.registrar = async (req, res) => {
     const { nombre, correo, contrasena } = req.body;
@@ -168,30 +159,29 @@ exports.solicitarRecuperacion = async (req, res) => {
             await User.updateRecoveryCode(user.id, codigoSecreto, tiempoExpiracion);
         }
 
-        try {
-            const mailOptions = {
-                from: `"FlowPay Soporte" <${process.env.SMTP_USER}>`, 
-                to: user.correo,
-                subject: '🔢 Código de recuperación de contraseña - FlowPay',
-                html: `
-                    <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
-                        <h2 style="color: #1DB954; text-align: center; font-size: 26px; margin-bottom: 5px;">FlowPay</h2>
-                        <p style="font-size: 15px; color: #e0e0e0; text-align: center;">Hola, <strong>${user.nombre}</strong></p>
-                        <p style="font-size: 13px; color: #a0a0a0; text-align: center; line-height: 20px;">Recibimos una solicitud para restablecer tu acceso. Introduce este código de seguridad de 6 dígitos dentro de la aplicación para verificar tu cuenta:</p>
-                        
-                        <div style="background-color: rgba(29, 185, 84, 0.08); border: 2px dashed #1DB954; border-radius: 12px; padding: 15px; text-align: center; margin: 25px 0;">
-                            <span style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #1DB954;">${codigoSecreto}</span>
-                        </div>
-                        
-                        <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos.</p>
-                    </div>
-                `
-            };
+        const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+        sendSmtpEmail.subject = "🔢 Código de recuperación de contraseña - FlowPay";
+        sendSmtpEmail.htmlContent = `
+            <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
+                <h2 style="color: #1DB954; text-align: center; font-size: 26px; margin-bottom: 5px;">FlowPay</h2>
+                <p style="font-size: 15px; color: #e0e0e0; text-align: center;">Hola, <strong>${user.nombre}</strong></p>
+                <p style="font-size: 13px; color: #a0a0a0; text-align: center; line-height: 20px;">Recibimos una solicitud para restablecer tu acceso. Introduce este código de seguridad de 6 dígitos dentro de la aplicación para verificar tu cuenta:</p>
+                
+                <div style="background-color: rgba(29, 185, 84, 0.08); border: 2px dashed #1DB954; border-radius: 12px; padding: 15px; text-align: center; margin: 25px 0;">
+                    <span style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #1DB954;">${codigoSecreto}</span>
+                </div>
+                
+                <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos.</p>
+            </div>
+        `;
+        sendSmtpEmail.sender = { "name": "FlowPay Soporte", "email": process.env.SMTP_USER }; 
+        sendSmtpEmail.to = [{ "email": user.correo }];
 
-            await transporter.sendMail(mailOptions);
-            console.log(`📧 Correo enviado real con éxito vía Brevo a: ${user.correo}`);
+        try {
+            await apiInstance.sendTransacEmail(sendSmtpEmail);
+            console.log(`📧 Correo enviado con éxito por API HTTP a: ${user.correo}`);
         } catch (mailError) {
-            console.error('❌ Error enviando a través del servidor SMTP de Brevo:', mailError.message);
+            console.error('❌ Error enviando a través de la API de Brevo:', mailError.message);
         }
 
         console.log(`\n=== 🔢 CÓDIGO GUARDADO EN SERVIDOR: ${codigoSecreto} ===\n`);
