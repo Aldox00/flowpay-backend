@@ -2,10 +2,8 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
-const Brevo = require('@getbrevo/brevo'); 
+
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const apiInstance = new Brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.SMTP_PASS);
 
 exports.registrar = async (req, res) => {
     const { nombre, correo, contrasena } = req.body;
@@ -158,29 +156,42 @@ exports.solicitarRecuperacion = async (req, res) => {
             await User.updateRecoveryCode(user.id, codigoSecreto, tiempoExpiracion);
         }
 
-        const sendSmtpEmail = new Brevo.SendSmtpEmail();
-        sendSmtpEmail.subject = "🔢 Código de recuperación de contraseña - FlowPay";
-        sendSmtpEmail.htmlContent = `
-            <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
-                <h2 style="color: #1DB954; text-align: center; font-size: 26px; margin-bottom: 5px;">FlowPay</h2>
-                <p style="font-size: 15px; color: #e0e0e0; text-align: center;">Hola, <strong>${user.nombre}</strong></p>
-                <p style="font-size: 13px; color: #a0a0a0; text-align: center; line-height: 20px;">Recibimos una solicitud para restablecer tu acceso. Introduce este código de seguridad de 6 dígitos dentro de la aplicación para verificar tu cuenta:</p>
-                
-                <div style="background-color: rgba(29, 185, 84, 0.08); border: 2px dashed #1DB954; border-radius: 12px; padding: 15px; text-align: center; margin: 25px 0;">
-                    <span style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #1DB954;">${codigoSecreto}</span>
-                </div>
-                
-                <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos.</p>
-            </div>
-        `;
-        sendSmtpEmail.sender = { "name": "FlowPay Soporte", "email": process.env.SMTP_USER }; 
-        sendSmtpEmail.to = [{ "email": user.correo }];
-
         try {
-            await apiInstance.sendTransacEmail(sendSmtpEmail);
-            console.log(`📧 Correo enviado real con éxito vía API HTTP a: ${user.correo}`);
+            const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'api-key': process.env.SMTP_PASS, 
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sender: { name: "FlowPay Soporte", email: process.env.SMTP_USER },
+                    to: [{ email: user.correo }],
+                    subject: "🔢 Código de recuperación de contraseña - FlowPay",
+                    htmlContent: `
+                        <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
+                            <h2 style="color: #1DB954; text-align: center; font-size: 26px; margin-bottom: 5px;">FlowPay</h2>
+                            <p style="font-size: 15px; color: #e0e0e0; text-align: center;">Hola, <strong>${user.nombre}</strong></p>
+                            <p style="font-size: 13px; color: #a0a0a0; text-align: center; line-height: 20px;">Recibimos una solicitud para restablecer tu acceso. Introduce este código de seguridad de 6 dígitos dentro de la aplicación para verificar tu cuenta:</p>
+                            
+                            <div style="background-color: rgba(29, 185, 84, 0.08); border: 2px dashed #1DB954; border-radius: 12px; padding: 15px; text-align: center; margin: 25px 0;">
+                                <span style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #1DB954;">${codigoSecreto}</span>
+                            </div>
+                            
+                            <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos.</p>
+                        </div>
+                    `
+                })
+            });
+
+            if (response.ok) {
+                console.log(`📧 ¡Correo real enviado perfectamente vía API Nativa a: ${user.correo}!`);
+            } else {
+                const errData = await response.text();
+                console.error('❌ Brevo rechazó la petición API:', errData);
+            }
         } catch (mailError) {
-            console.error('❌ Error enviando a través de la API de Brevo:', mailError.message);
+            console.error('❌ Error de red al consultar la API de Brevo:', mailError.message);
         }
 
         console.log(`\n=== 🔢 CÓDIGO GUARDADO EN SERVIDOR: ${codigoSecreto} ===\n`);
