@@ -15,8 +15,8 @@ const User = {
     },
 
     createGoogleUser: async (nombre, correo) => {
-        // 🟢 MODIFICACIÓN QUIRÚRGICA: Insertamos explícitamente 'google' en la nueva columna
-        const query = 'INSERT INTO usuarios (nombre, correo, contrasena, proveedor_auth) VALUES (?, ?, NULL, "google")';
+        // 🟢 SOLUCIÓN: Usamos backticks afuera y comillas simples para 'google' para que MySQL lea el valor correctamente
+        const query = `INSERT INTO usuarios (nombre, correo, contrasena, proveedor_auth) VALUES (?, ?, NULL, 'google')`;
         const [result] = await pool.query(query, [nombre, correo]);
         return result.insertId; // Retorna el ID del nuevo usuario creado
     },
