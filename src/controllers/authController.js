@@ -2,8 +2,17 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const nodemailer = require('nodemailer'); 
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS  
+    }
+});
 
 exports.registrar = async (req, res) => {
     const { nombre, correo, contrasena } = req.body;
@@ -157,18 +166,37 @@ exports.solicitarRecuperacion = async (req, res) => {
             { expiresIn: '15m' }
         );
 
-        console.log(`\n=== 🔢 CÓDIGO ENVIADO A ${correo}: ${codigoSecreto} ===`);
-        console.log(`=== TOKEN CON CÓDIGO (Enviar a Android): ${tokenConCodigo} ===\n`);
+        const mailOptions = {
+            from: `"FlowPay Soporte" <${process.env.EMAIL_USER}>`,
+            to: user.correo,
+            subject: '🔢 Código de recuperación de contraseña - FlowPay',
+            html: `
+                <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
+                    <h2 style="color: #1DB954; text-align: center; font-size: 26px; margin-bottom: 5px;">FlowPay</h2>
+                    <p style="font-size: 15px; color: #e0e0e0; text-align: center;">Hola, <strong>${user.nombre}</strong></p>
+                    <p style="font-size: 13px; color: #a0a0a0; text-align: center; line-height: 20px;">Recibimos una solicitud para restablecer tu acceso. Introduce este código de seguridad de 6 dígitos dentro de la aplicación para verificar tu cuenta:</p>
+                    
+                    <div style="background-color: rgba(29, 185, 84, 0.08); border: 2px dashed #1DB954; border-radius: 12px; padding: 15px; text-align: center; margin: 25px 0;">
+                        <span style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #1DB954;">${codigoSecreto}</span>
+                    </div>
+                    
+                    <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos. Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`\n📧 Correo enviado con éxito a ${user.correo}. Código impreso: ${codigoSecreto}`);
 
         return res.status(200).json({
             ok: true,
-            msg: 'Código de verificación enviado con éxito a tu correo.',
+            msg: 'Código de seguridad enviado con éxito a tu correo.',
             token: tokenConCodigo 
         });
 
     } catch (error) {
-        console.error('Error en solicitarRecuperacion:', error);
-        return res.status(500).json({ ok: false, msg: 'Error interno en el servidor al solicitar recuperación.' });
+        console.error('❌ Error crítico en solicitarRecuperacion o Nodemailer:', error);
+        return res.status(500).json({ ok: false, msg: 'Error en el servidor al enviar el correo de verificación.' });
     }
 };
 
