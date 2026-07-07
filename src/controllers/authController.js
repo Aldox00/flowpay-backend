@@ -44,13 +44,6 @@ exports.login = async (req, res) => {
             return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Correo no encontrado)' });
         }
 
-        if (user.proveedor_auth === 'google') {
-            return res.status(400).json({ 
-                ok: false, 
-                msg: 'Esta cuenta utiliza autenticación de Google. Por favor, inicia sesión con el botón de Google.' 
-            });
-        }
-
         const isMatch = await bcrypt.compare(contrasena, user.contrasena);
         if (!isMatch) {
             return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Contraseña incorrecta)' });
@@ -156,13 +149,6 @@ exports.solicitarRecuperacion = async (req, res) => {
             return res.status(400).json({ ok: false, msg: 'No se encontró ningún usuario con este correo.' });
         }
 
-        if (user.proveedor_auth === 'google') {
-            return res.status(400).json({ 
-                ok: false, 
-                msg: 'Esta cuenta está registrada con Google. No es necesario restablecer contraseña.' 
-            });
-        }
-
         const codigoSecreto = Math.floor(100000 + Math.random() * 900000).toString();
 
         const tokenConCodigo = jwt.sign(
@@ -171,7 +157,6 @@ exports.solicitarRecuperacion = async (req, res) => {
             { expiresIn: '15m' }
         );
 
-   
         console.log(`\n=== 🔢 CÓDIGO ENVIADO A ${correo}: ${codigoSecreto} ===`);
         console.log(`=== TOKEN CON CÓDIGO (Enviar a Android): ${tokenConCodigo} ===\n`);
 
