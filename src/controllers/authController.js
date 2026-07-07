@@ -2,20 +2,9 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
-const nodemailer = require('nodemailer'); 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, 
-    auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS  
-    },
-    tls: {
-        rejectUnauthorized: false 
-    }
-});
+const { Resend } = require('resend');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 exports.registrar = async (req, res) => {
     const { nombre, correo, contrasena } = req.body;
@@ -162,17 +151,16 @@ exports.solicitarRecuperacion = async (req, res) => {
         }
 
         const codigoSecreto = Math.floor(100000 + Math.random() * 900000).toString();
+        const tiempoExpiracion = new Date(Date.now() + 15 * 60 * 1000); 
 
-        const tokenConCodigo = jwt.sign(
-            { id: user.id, correo: user.correo, codigo: codigoSecreto },
-            process.env.JWT_SECRET || 'firma_secreta_flowpay',
-            { expiresIn: '15m' }
-        );
+        if (User.updateRecoveryCode) {
+            await User.updateRecoveryCode(user.id, codigoSecreto, tiempoExpiracion);
+        }
 
         try {
-            const mailOptions = {
-                from: `"FlowPay Soporte" <${process.env.EMAIL_USER}>`,
-                to: user.correo,
+            await resend.emails.send({
+                from: 'FlowPay <onboarding@resend.dev>', 
+                to: user.correo,                      
                 subject: '🔢 Código de recuperación de contraseña - FlowPay',
                 html: `
                     <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
@@ -184,24 +172,21 @@ exports.solicitarRecuperacion = async (req, res) => {
                             <span style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #1DB954;">${codigoSecreto}</span>
                         </div>
                         
-                        <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos. Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>
+                        <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos.</p>
                     </div>
                 `
-            };
-
-            await transporter.sendMail(mailOptions);
-            console.log(`\n📧 Correo enviado con éxito a ${user.correo}.`);
-
+            });
+            console.log(`\n📧 Correo real despachado con éxito vía Resend a: ${user.correo}`);
         } catch (mailError) {
-            console.error('⚠️ ALERTA: No se pudo despachar el correo real, pero generamos token de respaldo:', mailError.message);
+            console.error('❌ Error de conexión con la API de Resend:', mailError.message);
         }
 
-        console.log(`\n=== 🔢 CÓDIGO GENERADO: ${codigoSecreto} ===\n`);
+        console.log(`\n=== 🔢 CÓDIGO GUARDADO EN SERVIDOR: ${codigoSecreto} ===\n`);
 
         return res.status(200).json({
             ok: true,
-            msg: 'Código de seguridad procesado.',
-            token: tokenConCodigo 
+            msg: 'Código de seguridad enviado con éxito a tu correo electrónico.',
+            correo: user.correo  
         });
 
     } catch (error) {
@@ -211,27 +196,40 @@ exports.solicitarRecuperacion = async (req, res) => {
 };
 
 exports.verificarCodigo = async (req, res) => {
-    const { token, codigoIngresado } = req.body;
-
-    if (!token || !codigoIngresado) {
-        return res.status(400).json({ ok: false, msg: 'El token y el código son obligatorios.' });
+    const { correo, codigoIngresado } = req.body; 
+    if (!correo || !codigoIngresado) {
+        return res.status(400).json({ ok: false, msg: 'El correo y el código son obligatorios.' });
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'firma_secreta_flowpay');
+        const user = await User.findByCorreo(correo);
+        if (!user) {
+            return res.status(400).json({ ok: false, msg: 'Usuario no encontrado.' });
+        }
 
-        if (decoded.codigo !== codigoIngresado.trim()) {
+        if (!user.codigo_recuperacion || user.codigo_recuperacion !== codigoIngresado.trim()) {
             return res.status(400).json({ ok: false, msg: 'El código de verificación es incorrecto.' });
         }
 
+        if (user.codigo_expiracion && new Date() > new Date(user.codigo_expiracion)) {
+            return res.status(400).json({ ok: false, msg: 'El código ha expirado. Solicita uno nuevo.' });
+        }
+
+        const tokenAutorizado = jwt.sign(
+            { id: user.id, correo: user.correo, verificado: true },
+            process.env.JWT_SECRET || 'firma_secreta_flowpay',
+            { expiresIn: '10m' }
+        );
+
         return res.status(200).json({
             ok: true,
-            msg: 'Código verificado con éxito. Identidad confirmada.'
+            msg: 'Código verificado con éxito. Identidad confirmada.',
+            token: tokenAutorizado 
         });
 
     } catch (error) {
         console.error('Error en verificarCodigo:', error);
-        return res.status(401).json({ ok: false, msg: 'El código ha expirado o el token es inválido. Intenta de nuevo.' });
+        return res.status(500).json({ ok: false, msg: 'Error interno al validar el código.' });
     }
 };
 
@@ -245,10 +243,18 @@ exports.restablecerContrasena = async (req, res) => {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'firma_secreta_flowpay');
         
+        if (!decoded.verificado) {
+            return res.status(401).json({ ok: false, msg: 'Acceso no autorizado para reestablecer credenciales.' });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedContrasena = await bcrypt.hash(nuevaContrasena, salt);
 
         await User.updateContrasena(decoded.id, hashedContrasena);
+
+        if (User.updateRecoveryCode) {
+            await User.updateRecoveryCode(decoded.id, null, null);
+        }
 
         return res.status(200).json({
             ok: true,
@@ -257,7 +263,7 @@ exports.restablecerContrasena = async (req, res) => {
 
     } catch (error) {
         console.error('Error en restablecerContrasena:', error);
-        return res.status(401).json({ ok: false, msg: 'El token es inválido o ha expirado.' });
+        return res.status(401).json({ ok: false, msg: 'El token es inválido o ha expirado. Inténtalo de nuevo.' });
     }
 };
 

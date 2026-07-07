@@ -16,12 +16,18 @@ const User = {
     createGoogleUser: async (nombre, correo) => {
         const query = `INSERT INTO usuarios (nombre, correo, contrasena, proveedor_auth) VALUES (?, ?, NULL, 'google')`;
         const [result] = await pool.query(query, [nombre, correo]);
-        return result.insertId; // Retorna el ID del nuevo usuario creado
+        return result.insertId; 
     },
 
     updateContrasena: async (id, nuevaContrasenaEncriptada) => {
         const query = 'UPDATE usuarios SET contrasena = ? WHERE id = ?';
         const [result] = await pool.query(query, [nuevaContrasenaEncriptada, id]);
+        return result;
+    },
+
+    updateRecoveryCode: async (id, codigo, expiracion) => {
+        const query = 'UPDATE usuarios SET codigo_recuperacion = ?, codigo_expiracion = ? WHERE id = ?';
+        const [result] = await pool.query(query, [codigo, expiracion, id]);
         return result;
     }
 };
