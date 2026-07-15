@@ -156,9 +156,7 @@ exports.solicitarRecuperacion = async (req, res) => {
             await User.updateRecoveryCode(user.id, codigoSecreto, tiempoExpiracion);
         }
 
-      // ... (Todo lo demás se queda igual de arriba) ...
-
-        // 🟢 PETICIÓN HTTP DIRECTA A BREVO (Con tu remitente real verificado)
+      
         try {
             const response = await fetch('https://api.brevo.com/v3/smtp/email', {
                 method: 'POST',
@@ -168,7 +166,6 @@ exports.solicitarRecuperacion = async (req, res) => {
                     'content-type': 'application/json'
                 },
                 body: JSON.stringify({
-                    // 🟢 CAMBIO AQUÍ: Forzamos tu correo verificado en el sender
                     sender: { name: "FlowPay Soporte", email: "josuealdo510@gmail.com" },
                     to: [{ email: user.correo }],
                     subject: "🔢 Código de recuperación de contraseña - FlowPay",
