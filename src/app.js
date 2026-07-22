@@ -19,11 +19,10 @@ app.get("/api/health", (req, res) => {
         proyecto: "FlowPay",
         fecha_servidor: new Date(),
         cesar: "alejandro",
-        aldo: "puto"
     });
 });
 
-app.use('/api/auth', authRoutes); 
+app.use('/api/auth', authRoutes);          
 app.use('/api/jornada', jornadaRoutes);
 app.use('/api/producto', productoRoutes);
 app.use('/api/venta', ventaRoutes);

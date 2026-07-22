@@ -1,9 +1,4 @@
-const User = require('../models/userModel');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { OAuth2Client } = require('google-auth-library');
-
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const authService = require('../services/authService');
 
 exports.registrar = async (req, res) => {
     const { nombre, correo, contrasena } = req.body;
@@ -13,21 +8,12 @@ exports.registrar = async (req, res) => {
     }
 
     try {
-        const userExists = await User.findByCorreo(correo);
-        if (userExists) {
-            return res.status(400).json({ ok: false, msg: 'El correo ya está registrado' });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedContrasena = await bcrypt.hash(contrasena, salt);
-
-        await User.create({ nombre, correo, contrasena: hashedContrasena });
-        
-        return res.status(201).json({ ok: true, msg: 'Usuario registrado con éxito' });
-
+        const resultado = await authService.registrarUsuario({ nombre, correo, contrasena });
+        return res.status(201).json({ ok: true, msg: resultado.msg });
     } catch (error) {
         console.error('Error en el registro:', error);
-        return res.status(500).json({ ok: false, msg: 'Error en el servidor al registrar usuario' });
+        const status = error.statusCode || 500;
+        return res.status(status).json({ ok: false, msg: error.message || 'Error en el servidor al registrar usuario' });
     }
 };
 
@@ -39,37 +25,16 @@ exports.login = async (req, res) => {
     }
 
     try {
-        const user = await User.findByCorreo(correo);
-        if (!user) {
-            return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Correo no encontrado)' });
-        }
-
-        const isMatch = await bcrypt.compare(contrasena, user.contrasena);
-        if (!isMatch) {
-            return res.status(400).json({ ok: false, msg: 'Credenciales incorrectas (Contraseña incorrecta)' });
-        }
-
-        const token = jwt.sign(
-            { id: user.id, nombre: user.nombre },
-            process.env.JWT_SECRET || 'firma_secreta_flowpay',
-            { expiresIn: '30d' }
-        );
-
+        const resultado = await authService.loginUsuario({ correo, contrasena });
         return res.status(200).json({
             ok: true,
-            token,
-            usuario: {
-                id: user.id,
-                nombre: user.nombre,
-                correo: user.correo,
-                recordatorio_cierre: user.recordatorio_cierre,
-                hora_recordatorio: user.hora_recordatorio
-            }
+            token: resultado.token,
+            usuario: resultado.usuario
         });
-
     } catch (error) {
         console.error('Error en el login:', error);
-        return res.status(500).json({ ok: false, msg: 'Error en el servidor al iniciar sesión' });
+        const status = error.statusCode || 500;
+        return res.status(status).json({ ok: false, msg: error.message || 'Error en el servidor al iniciar sesión' });
     }
 };
 
@@ -81,58 +46,16 @@ exports.googleLogin = async (req, res) => {
     }
 
     try {
-        const ticket = await client.verifyIdToken({
-            idToken: idToken,
-            audience: process.env.GOOGLE_CLIENT_ID, 
-        });
-        
-        const payload = ticket.getPayload();
-        const { email, name } = payload; 
-
-        let user = await User.findByCorreo(email);
-        
-        if (!user) {
-            try {
-                const newUserId = await User.createGoogleUser(name, email);
-                user = { 
-                    id: newUserId, 
-                    nombre: name, 
-                    correo: email, 
-                    recordatorio_cierre: 0, 
-                    hora_recordatorio: null,
-                    proveedor_auth: 'google' 
-                };
-            } catch (dbError) {
-                console.error('❌ ERROR REAL EN BD AL CREAR USUARIO GOOGLE:', dbError);
-                return res.status(500).json({ 
-                    ok: false, 
-                    msg: 'Error interno en la base de datos al registrar la nueva cuenta de Google.',
-                    error: dbError.message 
-                });
-            }
-        }
-
-        const token = jwt.sign(
-            { id: user.id, nombre: user.nombre },
-            process.env.JWT_SECRET || 'firma_secreta_flowpay',
-            { expiresIn: '30d' }
-        );
-
+        const resultado = await authService.googleLoginService(idToken);
         return res.status(200).json({
             ok: true,
-            token,
-            usuario: {
-                id: user.id,
-                nombre: user.nombre,
-                correo: user.correo,
-                recordatorio_cierre: user.recordatorio_cierre,
-                hora_recordatorio: user.hora_recordatorio
-            }
+            token: resultado.token,
+            usuario: resultado.usuario
         });
-
     } catch (error) {
         console.error('Error en Google Auth (Token):', error);
-        return res.status(401).json({ ok: false, msg: 'Token de Google inválido o expirado.' });
+        const status = error.statusCode || 401;
+        return res.status(status).json({ ok: false, msg: error.message || 'Token de Google inválido o expirado.' });
     }
 };
 
@@ -144,106 +67,37 @@ exports.solicitarRecuperacion = async (req, res) => {
     }
 
     try {
-        const user = await User.findByCorreo(correo);
-        if (!user) {
-            return res.status(400).json({ ok: false, msg: 'No se encontró ningún usuario con este correo.' });
-        }
-
-        const codigoSecreto = Math.floor(100000 + Math.random() * 900000).toString();
-        const tiempoExpiracion = new Date(Date.now() + 15 * 60 * 1000); 
-
-        if (User.updateRecoveryCode) {
-            await User.updateRecoveryCode(user.id, codigoSecreto, tiempoExpiracion);
-        }
-
-      
-        try {
-            const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-                method: 'POST',
-                headers: {
-                    'accept': 'application/json',
-                    'api-key': process.env.SMTP_PASS, 
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify({
-                    sender: { name: "FlowPay Soporte", email: "josuealdo510@gmail.com" },
-                    to: [{ email: user.correo }],
-                    subject: "🔢 Código de recuperación de contraseña - FlowPay",
-                    htmlContent: `
-                        <div style="font-family: Arial, sans-serif; background-color: #111A2E; color: #ffffff; padding: 40px; border-radius: 20px; max-width: 450px; margin: auto; border: 1px solid rgba(255,255,255,0.1);">
-                            <h2 style="color: #1DB954; text-align: center; font-size: 26px; margin-bottom: 5px;">FlowPay</h2>
-                            <p style="font-size: 15px; color: #e0e0e0; text-align: center;">Hola, <strong>${user.nombre}</strong></p>
-                            <p style="font-size: 13px; color: #a0a0a0; text-align: center; line-height: 20px;">Recibimos una solicitud para restablecer tu acceso. Introduce este código de seguridad de 6 dígitos dentro de la aplicación para verificar tu cuenta:</p>
-                            
-                            <div style="background-color: rgba(29, 185, 84, 0.08); border: 2px dashed #1DB954; border-radius: 12px; padding: 15px; text-align: center; margin: 25px 0;">
-                                <span style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #1DB954;">${codigoSecreto}</span>
-                            </div>
-                            
-                            <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">Este código expirará automáticamente en 15 minutos.</p>
-                        </div>
-                    `
-                })
-            });
-
-            if (response.ok) {
-                console.log(`📧 ¡Correo real enviado perfectamente vía API Nativa a: ${user.correo}!`);
-            } else {
-                const errData = await response.text();
-                console.error('❌ Brevo rechazó la petición API:', errData);
-            }
-        } catch (mailError) {
-            console.error('❌ Error de red al consultar la API de Brevo:', mailError.message);
-        }
-        
-        console.log(`\n=== 🔢 CÓDIGO GUARDADO EN SERVIDOR: ${codigoSecreto} ===\n`);
-
+        const resultado = await authService.solicitarRecuperacionService(correo);
         return res.status(200).json({
             ok: true,
             msg: 'Código de seguridad enviado con éxito a tu correo electrónico.',
-            correo: user.correo  
+            correo: resultado.correo
         });
-
     } catch (error) {
         console.error('❌ Error crítico en solicitarRecuperacion:', error);
-        return res.status(500).json({ ok: false, msg: 'Error interno en el servidor.' });
+        const status = error.statusCode || 500;
+        return res.status(status).json({ ok: false, msg: error.message || 'Error interno en el servidor.' });
     }
 };
 
 exports.verificarCodigo = async (req, res) => {
-    const { correo, codigoIngresado } = req.body; 
+    const { correo, codigoIngresado } = req.body;
+
     if (!correo || !codigoIngresado) {
         return res.status(400).json({ ok: false, msg: 'El correo y el código son obligatorios.' });
     }
 
     try {
-        const user = await User.findByCorreo(correo);
-        if (!user) {
-            return res.status(400).json({ ok: false, msg: 'Usuario no encontrado.' });
-        }
-
-        if (!user.codigo_recuperacion || user.codigo_recuperacion !== codigoIngresado.trim()) {
-            return res.status(400).json({ ok: false, msg: 'El código de verificación es incorrecto.' });
-        }
-
-        if (user.codigo_expiracion && new Date() > new Date(user.codigo_expiracion)) {
-            return res.status(400).json({ ok: false, msg: 'El código ha expirado. Solicita uno nuevo.' });
-        }
-
-        const tokenAutorizado = jwt.sign(
-            { id: user.id, correo: user.correo, verificado: true },
-            process.env.JWT_SECRET || 'firma_secreta_flowpay',
-            { expiresIn: '10m' }
-        );
-
+        const resultado = await authService.verificarCodigoService(correo, codigoIngresado);
         return res.status(200).json({
             ok: true,
             msg: 'Código verificado con éxito. Identidad confirmada.',
-            token: tokenAutorizado 
+            token: resultado.token
         });
-
     } catch (error) {
         console.error('Error en verificarCodigo:', error);
-        return res.status(500).json({ ok: false, msg: 'Error interno al validar el código.' });
+        const status = error.statusCode || 500;
+        return res.status(status).json({ ok: false, msg: error.message || 'Error interno al validar el código.' });
     }
 };
 
@@ -255,29 +109,15 @@ exports.restablecerContrasena = async (req, res) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'firma_secreta_flowpay');
-        
-        if (!decoded.verificado) {
-            return res.status(401).json({ ok: false, msg: 'Acceso no autorizado para reestablecer credenciales.' });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedContrasena = await bcrypt.hash(nuevaContrasena, salt);
-
-        await User.updateContrasena(decoded.id, hashedContrasena);
-
-        if (User.updateRecoveryCode) {
-            await User.updateRecoveryCode(decoded.id, null, null);
-        }
-
+        const resultado = await authService.restablecerContrasenaService(token, nuevaContrasena);
         return res.status(200).json({
             ok: true,
-            msg: 'Tu contraseña ha sido restablecida con éxito. Ya puedes iniciar sesión.'
+            msg: resultado.msg
         });
-
     } catch (error) {
         console.error('Error en restablecerContrasena:', error);
-        return res.status(401).json({ ok: false, msg: 'El token es inválido o ha expirado. Inténtalo de nuevo.' });
+        const status = error.statusCode || 401;
+        return res.status(status).json({ ok: false, msg: error.message || 'El token es inválido o ha expirado. Inténtalo de nuevo.' });
     }
 };
 
@@ -289,17 +129,11 @@ exports.verificarProveedor = async (req, res) => {
     }
 
     try {
-        const user = await User.findByCorreo(correo);
-        
-        if (!user) {
-            return res.status(200).json({ ok: true, esGoogle: false });
-        }
-
-        const esGoogle = user.proveedor_auth === 'google';
-        return res.status(200).json({ ok: true, esGoogle });
-
+        const resultado = await authService.verificarProveedorService(correo);
+        return res.status(200).json({ ok: true, esGoogle: resultado.esGoogle });
     } catch (error) {
         console.error('Error al verificar proveedor:', error);
-        return res.status(500).json({ ok: false, msg: 'Error en el servidor al verificar proveedor' });
+        const status = error.statusCode || 500;
+        return res.status(status).json({ ok: false, msg: error.message || 'Error en el servidor al verificar proveedor' });
     }
 };

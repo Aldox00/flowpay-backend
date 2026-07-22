@@ -1,4 +1,4 @@
-const Jornada = require('../models/jornadaModel');
+const jornadaService = require('../services/jornadaService');
 
 exports.abrirJornada = async (req, res) => {
     const { usuario_id, monto_inversion } = req.body;
@@ -8,25 +8,23 @@ exports.abrirJornada = async (req, res) => {
     }
 
     try {
-        const jornadaActiva = await Jornada.findActivaByUsuarioId(usuario_id);
-        
-        if (jornadaActiva) {
-            return res.status(400).json({ 
-                ok: false, 
-                msg: 'No puedes abrir una nueva jornada si ya tienes una activa. Cierra la caja actual primero.',
-                jornadaId: jornadaActiva.id
-            });
-        }
-
-        const result = await Jornada.create({ usuario_id, monto_inversion });
+        const resultado = await jornadaService.abrirJornadaService({ usuario_id, monto_inversion });
         return res.status(201).json({
             ok: true,
             msg: '¡Jornada iniciada con éxito! Ya puedes empezar a vender.',
-            jornadaId: result.insertId
+            jornadaId: resultado.jornadaId
         });
-
     } catch (error) {
         console.error('Error al abrir la jornada:', error);
+        
+        if (error.statusCode === 400) {
+            return res.status(400).json({
+                ok: false,
+                msg: error.message,
+                jornadaId: error.jornadaId
+            });
+        }
+
         return res.status(500).json({ ok: false, msg: 'Error en el servidor al abrir la jornada.' });
     }
 };
@@ -35,18 +33,21 @@ exports.obtenerEstadoJornada = async (req, res) => {
     const { usuario_id } = req.params;
 
     try {
-        const jornadaActiva = await Jornada.findActivaByUsuarioId(usuario_id);
-        
-        if (!jornadaActiva) {
-            return res.status(200).json({ ok: true, activa: false, msg: 'No hay ninguna jornada activa para este usuario.' });
+        const resultado = await jornadaService.obtenerEstadoJornadaService(usuario_id);
+
+        if (!resultado.activa) {
+            return res.status(200).json({
+                ok: true,
+                activa: false,
+                msg: resultado.msg
+            });
         }
 
         return res.status(200).json({
             ok: true,
             activa: true,
-            jornada: jornadaActiva
+            jornada: resultado.jornada
         });
-
     } catch (error) {
         console.error('Error al obtener el estado de la jornada:', error);
         return res.status(500).json({ ok: false, msg: 'Error en el servidor al consultar el estado de la jornada.' });
@@ -68,7 +69,7 @@ exports.cerrarJornada = async (req, res) => {
     }
 
     try {
-        const balanceFinal = await Jornada.cerrar({
+        const resultado = await jornadaService.cerrarJornadaService({
             jornada_id,
             monto_inversion,
             monto_ventas_efectivo,
@@ -80,7 +81,7 @@ exports.cerrarJornada = async (req, res) => {
         return res.status(200).json({
             ok: true,
             msg: 'Jornada finalizada con éxito. Caja cerrada de forma permanente.',
-            balance: balanceFinal
+            balance: resultado.balance
         });
 
     } catch (error) {
