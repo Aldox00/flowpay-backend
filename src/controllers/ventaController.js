@@ -13,7 +13,7 @@ exports.registrarVenta = async(req, res) => {
             detalles = JSON.parse(detalles);
         }
 
-        if (tipopago == 1) {
+        if (tipo_pago == 1) {
             return res.status(400).json({ ok: false, msg: "id encontrado pago en efectivo" })
         } else {
             return res.status(400).json({ ok: false, msg: tipo_pago })
