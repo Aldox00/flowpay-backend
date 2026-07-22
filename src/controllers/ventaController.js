@@ -30,6 +30,10 @@ exports.registrarVenta = async (req, res) => {
             return res.status(400).json({ ok: false, msg: error.message });
         }
 
-        return res.status(500).json({ ok: false, msg: 'Error en el servidor al procesar la venta.' });
+        return res.status(500).json({ 
+            ok: false, 
+            msg: 'Error en el servidor al procesar la venta.',
+            error: error.message 
+        });
     }
 };

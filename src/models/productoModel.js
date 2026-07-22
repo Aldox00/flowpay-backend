@@ -2,11 +2,12 @@ const pool = require('../config/db');
 
 const Producto = {
     create: async (productoData) => {
-        const query = 'INSERT INTO productos (usuario_id, nombre, precio_venta) VALUES (?, ?, ?)';
+        const query = 'INSERT INTO productos (usuario_id, nombre, precio_venta, foto_url) VALUES (?, ?, ?, ?)';
         const [result] = await pool.query(query, [
             productoData.usuario_id,
             productoData.nombre,
-            productoData.precio_venta ?? productoData.precio
+            productoData.precio_venta ?? productoData.precio,
+            productoData.foto_url || null
         ]);
         return result;
     },
