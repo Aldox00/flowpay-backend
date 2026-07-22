@@ -13,8 +13,26 @@ exports.registrarVentaService = async ({ jornada_id, total, tipo_pago, comproban
         throw error;
     }
 
+    const pagoLimpio = tipo_pago.toString().toLowerCase().trim();
+
+    let tipoPagoFormateado = '';
+    if (pagoLimpio === 'efectivo') {
+        tipoPagoFormateado = 'Efectivo';
+    } else if (pagoLimpio === 'transferencia') {
+        tipoPagoFormateado = 'Transferencia';
+    } else {
+        const error = new Error(`El método de pago '${tipo_pago}' no es válido.`);
+        error.statusCode = 400;
+        throw error;
+    }
+
     const ventaId = await Venta.createWithDetails(
-        { jornada_id, total, tipo_pago, comprobante_url }, 
+        { 
+            jornada_id, 
+            total, 
+            tipo_pago: tipoPagoFormateado, 
+            comprobante_url 
+        }, 
         detallesParsed
     );
 
