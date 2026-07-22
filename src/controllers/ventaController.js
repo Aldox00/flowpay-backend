@@ -13,12 +13,6 @@ exports.registrarVenta = async(req, res) => {
             detalles = JSON.parse(detalles);
         }
 
-        if (tipo_pago == 1) {
-            return res.status(400).json({ ok: false, msg: "id encontrado pago en efectivo" })
-        } else {
-            return res.status(400).json({ ok: false, msg: tipo_pago })
-
-        }
         if (!jornada_id || !total || !tipo_pago || !detalles || !detalles.length) {
             return res.status(400).json({ ok: false, msg: 'Datos de la venta incompletos o sin productos.' });
         }
@@ -35,6 +29,10 @@ exports.registrarVenta = async(req, res) => {
 
     } catch (error) {
         console.error('Error al registrar la transacción:', error);
-        return res.status(500).json({ ok: false, msg: 'Error en el servidor al procesar la venta.' });
+        return res.status(500).json({
+            ok: false,
+            msg: 'Error en el servidor al procesar la venta.',
+            error: error.message
+        });
     }
 };
