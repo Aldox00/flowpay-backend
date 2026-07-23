@@ -1,6 +1,6 @@
-const Venta = require('../models/ventaModel');
+const ventaService = require('../services/ventaService');
 
-exports.registrarVenta = async(req, res) => {
+exports.registrarVenta = async (req, res) => {
     let { jornada_id, total, tipo_pago, detalles } = req.body;
 
     let comprobante_url = null;
@@ -9,30 +9,31 @@ exports.registrarVenta = async(req, res) => {
     }
 
     try {
-        if (typeof detalles === 'string') {
-            detalles = JSON.parse(detalles);
-        }
-
-        if (!jornada_id || !total || !tipo_pago || !detalles || !detalles.length) {
-            return res.status(400).json({ ok: false, msg: 'Datos de la venta incompletos o sin productos.' });
-        }
-
-        const ventaId = await Venta.createWithDetails({ jornada_id, total, tipo_pago, comprobante_url },
+        const resultado = await ventaService.registrarVentaService({
+            jornada_id,
+            total,
+            tipo_pago,
+            comprobante_url,
             detalles
-        );
+        });
 
         return res.status(201).json({
             ok: true,
             msg: '¡Venta registrada con éxito!',
-            ventaId
+            ventaId: resultado.ventaId
         });
 
     } catch (error) {
         console.error('Error al registrar la transacción:', error);
-        return res.status(500).json({
-            ok: false,
+
+        if (error.statusCode === 400) {
+            return res.status(400).json({ ok: false, msg: error.message });
+        }
+
+        return res.status(500).json({ 
+            ok: false, 
             msg: 'Error en el servidor al procesar la venta.',
-            error: error.message
+            error: error.message 
         });
     }
 };

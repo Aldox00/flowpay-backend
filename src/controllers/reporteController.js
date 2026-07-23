@@ -1,41 +1,24 @@
-const Jornada = require('../models/jornadaModel');
-const pool = require('../config/db');
+const reporteService = require('../services/reporteService');
 
 exports.obtenerHistorialSemanal = async (req, res) => {
     const { usuario_id } = req.params;
 
     try {
-        const encuestaLiberada = await Jornada.verificarCandadoHistorial(usuario_id);
+        const resultado = await reporteService.obtenerHistorialSemanalService(usuario_id);
 
-        if (!encuestaLiberada) {
+        if (resultado.bloqueado) {
             return res.status(403).json({ 
                 ok: false, 
                 bloqueado: true,
-                msg: 'Acceso denegado. Debes responder la encuesta de satisfacción para desbloquear tus estadísticas.' 
+                msg: resultado.msg 
             });
         }
-
-        const queryHistorial = `
-            SELECT 
-                id, 
-                monto_inversion, 
-                monto_ventas_efectivo, 
-                monto_ventas_transferencia, 
-                (monto_ventas_efectivo + monto_ventas_transferencia) as total_vendido, 
-                ganancia_neta, 
-                fecha_fin
-            FROM jornadas 
-            WHERE usuario_id = ? AND estado = 'cerrada'
-            ORDER BY fecha_fin DESC 
-            LIMIT 7
-        `;
-        const [reportes] = await pool.query(queryHistorial, [usuario_id]);
 
         return res.status(200).json({
             ok: true,
             bloqueado: false,
-            msg: 'Historial semanal cargado con éxito.',
-            historial: reportes
+            msg: resultado.msg,
+            historial: resultado.historial
         });
 
     } catch (error) {

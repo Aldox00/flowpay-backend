@@ -1,4 +1,4 @@
-const Encuesta = require('../models/encuestaModel');
+const encuestaService = require('../services/encuestaService');
 
 exports.registrarEncuesta = async (req, res) => {
     const { jornada_id, puntuacion_app, comentarios } = req.body;
@@ -8,10 +8,11 @@ exports.registrarEncuesta = async (req, res) => {
     }
 
     try {
-        await Encuesta.guardarYLiberarHistorial(jornada_id, puntuacion_app, comentarios);
+        const resultado = await encuestaService.registrarEncuestaService(jornada_id, puntuacion_app, comentarios);
+        
         return res.status(201).json({
             ok: true,
-            msg: '¡Encuesta guardada con éxito! Historial semanal desbloqueado.'
+            msg: resultado.msg
         });
     } catch (error) {
         console.error('Error al registrar la encuesta:', error);
