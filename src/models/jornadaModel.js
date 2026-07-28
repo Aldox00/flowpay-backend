@@ -7,6 +7,12 @@ const Jornada = {
         return rows[0];
     },
 
+    findById: async (jornada_id) => {
+        const query = 'SELECT * FROM jornadas WHERE id = ? LIMIT 1';
+        const [rows] = await pool.query(query, [jornada_id]);
+        return rows[0];
+    },
+
     create: async (jornadaData) => {
         const query = 'INSERT INTO jornadas (usuario_id, monto_inversion, estado) VALUES (?, ?, ?)';
         const [result] = await pool.query(query, [
@@ -55,7 +61,7 @@ const Jornada = {
 
         const encuestaFinal = (esObjetoCompleto && datosCierre.encuesta_contestada !== undefined) 
             ? parseInt(datosCierre.encuesta_contestada, 10) 
-            : 0;
+            : (bd.encuesta_contestada !== undefined ? parseInt(bd.encuesta_contestada, 10) : 0);
 
         const queryUpdate = `
             UPDATE jornadas 
