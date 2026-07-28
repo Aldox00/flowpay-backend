@@ -5,7 +5,6 @@ const { OAuth2Client } = require('google-auth-library');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Helper interno para firmar los tokens JWT
 const generarJWT = (payload, expiresIn = '30d') => {
     return jwt.sign(
         payload,
@@ -14,7 +13,6 @@ const generarJWT = (payload, expiresIn = '30d') => {
     );
 };
 
-// 1. Registro de usuario
 exports.registrarUsuario = async ({ nombre, correo, contrasena }) => {
     const userExists = await User.findByCorreo(correo);
     if (userExists) {
@@ -26,11 +24,12 @@ exports.registrarUsuario = async ({ nombre, correo, contrasena }) => {
     const salt = await bcrypt.genSalt(10);
     const hashedContrasena = await bcrypt.hash(contrasena, salt);
 
+    //encriptacion de pwd
     await User.create({ nombre, correo, contrasena: hashedContrasena });
     return { msg: 'Usuario registrado con éxito' };
 };
 
-// 2. Login tradicional
+
 exports.loginUsuario = async ({ correo, contrasena }) => {
     const user = await User.findByCorreo(correo);
     if (!user) {
@@ -60,7 +59,6 @@ exports.loginUsuario = async ({ correo, contrasena }) => {
     };
 };
 
-// 3. Login con Google OAuth2
 exports.googleLoginService = async (idToken) => {
     const ticket = await client.verifyIdToken({
         idToken: idToken,
@@ -84,7 +82,7 @@ exports.googleLoginService = async (idToken) => {
                 proveedor_auth: 'google'
             };
         } catch (dbError) {
-            console.error('❌ ERROR REAL EN BD AL CREAR USUARIO GOOGLE:', dbError);
+            console.error(' ERROR REAL EN BD AL CREAR USUARIO GOOGLE:', dbError);
             const error = new Error('Error interno en la base de datos al registrar la nueva cuenta de Google.');
             error.statusCode = 500;
             throw error;
@@ -105,7 +103,6 @@ exports.googleLoginService = async (idToken) => {
     };
 };
 
-// 4. Solicitar Código de Recuperación y enviar vía Brevo API
 exports.solicitarRecuperacionService = async (correo) => {
     const user = await User.findByCorreo(correo);
     if (!user) {
@@ -153,18 +150,17 @@ exports.solicitarRecuperacionService = async (correo) => {
             console.log(`📧 ¡Correo enviado vía API a: ${user.correo}!`);
         } else {
             const errData = await response.text();
-            console.error('❌ Brevo rechazó la petición API:', errData);
+            console.error(' Brevo rechazó la petición API:', errData);
         }
     } catch (mailError) {
-        console.error('❌ Error de red con API de Brevo:', mailError.message);
+        console.error(' Error de red con API de Brevo:', mailError.message);
     }
 
-    console.log(`\n=== 🔢 CÓDIGO GUARDADO EN SERVIDOR: ${codigoSecreto} ===\n`);
+    console.log(`\n===  CÓDIGO GUARDADO EN SERVIDOR: ${codigoSecreto} ===\n`);
 
     return { correo: user.correo };
 };
 
-// 5. Verificar Código de Recuperación
 exports.verificarCodigoService = async (correo, codigoIngresado) => {
     const user = await User.findByCorreo(correo);
     if (!user) {
@@ -193,7 +189,6 @@ exports.verificarCodigoService = async (correo, codigoIngresado) => {
     return { token: tokenAutorizado };
 };
 
-// 6. Restablecer Contraseña
 exports.restablecerContrasenaService = async (token, nuevaContrasena) => {
     let decoded;
     try {

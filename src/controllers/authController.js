@@ -74,7 +74,7 @@ exports.solicitarRecuperacion = async (req, res) => {
             correo: resultado.correo
         });
     } catch (error) {
-        console.error('❌ Error crítico en solicitarRecuperacion:', error);
+        console.error('Error crítico en solicitarRecuperacion:', error);
         const status = error.statusCode || 500;
         return res.status(status).json({ ok: false, msg: error.message || 'Error interno en el servidor.' });
     }

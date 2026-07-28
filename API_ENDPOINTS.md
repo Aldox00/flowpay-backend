@@ -55,17 +55,7 @@ Cuerpo JSON:
 }
 ```
 
-### POST /api/auth/google
-- URL completa: `http://localhost:3000/api/auth/google`
-- Método: `POST`
-- Content-Type: `application/json`
 
-Cuerpo JSON:
-```json
-{
-  "idToken": "TOKEN_DE_GOOGLE_ID"
-}
-```
 
 ### POST /api/auth/forgot-password
 - URL completa: `http://localhost:3000/api/auth/forgot-password`

@@ -1,14 +1,14 @@
 const encuestaService = require('../services/encuestaService');
 
 exports.registrarEncuesta = async (req, res) => {
-    const { jornada_id, puntuacion_app, comentarios } = req.body;
+    const { id_usuario, pregunta_1, pregunta_2, pregunta_3 } = req.body;
 
-    if (!jornada_id || !puntuacion_app) {
-        return res.status(400).json({ ok: false, msg: 'El ID de jornada y la puntuación son obligatorios.' });
+    if (!id_usuario || pregunta_1 === undefined || pregunta_2 === undefined || pregunta_3 === undefined) {
+        return res.status(400).json({ ok: false, msg: 'id_usuario y las tres respuestas de encuesta son obligatorios.' });
     }
 
     try {
-        const resultado = await encuestaService.registrarEncuestaService(jornada_id, puntuacion_app, comentarios);
+        const resultado = await encuestaService.registrarEncuestaService(id_usuario, pregunta_1, pregunta_2, pregunta_3);
         
         return res.status(201).json({
             ok: true,
